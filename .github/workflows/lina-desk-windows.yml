@@ -1,6 +1,9 @@
 name: Lina Desk Windows client
 
 on:
+  push:
+    branches: [lina-desk]
+    paths: ['.github/workflows/lina-desk-windows.yml', 'src/**', 'flutter/**', 'libs/**', 'Cargo.toml', 'Cargo.lock']
   workflow_dispatch:
     inputs:
       upload-artifact:
