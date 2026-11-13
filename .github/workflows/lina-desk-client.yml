@@ -1,9 +1,11 @@
 name: Lina Desk client (Windows + Android)
 
-# Builds the Lina Desk support client from this fork only:
-#   - Windows x64 portable LinaDesk.exe
-#   - Android arm64-v8a APK (signed with the CI runner's generated debug key)
-# Both are uploaded as Actions artifacts. Nothing is published, released,
+# Builds Lina Desk from this fork only, in two variants of the same commit
+# (LINA_DESK_VARIANT, read by build.rs and android/app/build.gradle):
+#   - client:   the person being helped (incoming only, Allow decides)
+#   - operator: the owner's helper (outgoing only, nobody can connect to it)
+# Outputs: Windows x64 portable exe and Android arm64-v8a APK (signed with the
+# CI runner's generated debug key) for each variant, as Actions artifacts. Nothing is published, released,
 # tagged or signed with a production key here.
 
 on:
@@ -65,12 +67,19 @@ jobs:
           flutter analyze --no-fatal-infos --no-fatal-warnings lib/lina_desk lib/common.dart lib/desktop/pages/desktop_home_page.dart lib/desktop/pages/server_page.dart lib/desktop/pages/desktop_setting_page.dart lib/mobile/pages/server_page.dart lib/mobile/pages/settings_page.dart lib/mobile/pages/home_page.dart lib/consts.dart lib/main.dart
 
   build-windows:
-    name: windows x64 portable
+    name: windows x64 portable (${{ matrix.variant.name }})
     needs: [generate-bridge]
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { name: client, exe: LinaDesk, artifact: lina-desk-windows-x86_64 }
+          - { name: operator, exe: LinaDeskOperator, artifact: lina-desk-operator-windows-x86_64 }
     env:
       TARGET: x86_64-pc-windows-msvc
       VCPKG_TRIPLET: x64-windows-static
+      LINA_DESK_VARIANT: ${{ matrix.variant.name }}
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
@@ -157,36 +166,44 @@ jobs:
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./linadesk
           # Same convention as RustDesk custom clients: the program is named after the app.
-          mv ./linadesk/rustdesk.exe ./linadesk/LinaDesk.exe
+          mv ./linadesk/rustdesk.exe ./linadesk/${{ matrix.variant.exe }}.exe
           Get-ChildItem ./linadesk
 
-      - name: Build portable LinaDesk.exe
+      - name: Build portable ${{ matrix.variant.exe }}.exe
         shell: bash
         run: |
+          EXE=${{ matrix.variant.exe }}.exe
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../linadesk/ -o . -e ../../linadesk/LinaDesk.exe
+          python3 ./generate.py -f ../../linadesk/ -o . -e ../../linadesk/$EXE
           popd
           mkdir -p ./LinaDeskOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./LinaDeskOutput/LinaDesk.exe
+          mv ./target/release/rustdesk-portable-packer.exe ./LinaDeskOutput/$EXE
           cp LICENCE ./LinaDeskOutput/LICENCE.txt
-          echo "Lina Desk is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > ./LinaDeskOutput/SOURCE.txt
-          sha256sum ./LinaDeskOutput/LinaDesk.exe | tee ./LinaDeskOutput/LinaDesk.exe.sha256
+          echo "Lina Desk (${{ matrix.variant.name }}) ${{ env.VERSION }} is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > ./LinaDeskOutput/SOURCE.txt
+          sha256sum ./LinaDeskOutput/$EXE | tee ./LinaDeskOutput/$EXE.sha256
 
-      - name: Upload Lina Desk Windows client
+      - name: Upload Lina Desk Windows ${{ matrix.variant.name }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: lina-desk-windows-x86_64
+          name: ${{ matrix.variant.artifact }}
           path: ./LinaDeskOutput
           if-no-files-found: error
 
   build-android:
-    name: android arm64-v8a apk
+    name: android arm64-v8a apk (${{ matrix.variant.name }})
     needs: [generate-bridge]
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { name: client, apk: LinaDesk, artifact: lina-desk-android-arm64-v8a }
+          - { name: operator, apk: LinaDeskOperator, artifact: lina-desk-operator-android-arm64-v8a }
     env:
       TARGET: aarch64-linux-android
+      LINA_DESK_VARIANT: ${{ matrix.variant.name }}
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
@@ -327,15 +344,16 @@ jobs:
           pushd flutter
           flutter build apk --release --target-platform android-arm64 --split-per-abi
           popd
+          APK=${{ matrix.variant.apk }}-${{ env.VERSION }}-arm64-v8a.apk
           mkdir -p LinaDeskAndroid
-          mv flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk LinaDeskAndroid/LinaDesk-${{ env.VERSION }}-arm64-v8a.apk
+          mv flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk LinaDeskAndroid/$APK
           cp LICENCE LinaDeskAndroid/LICENCE.txt
-          echo "Lina Desk is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > LinaDeskAndroid/SOURCE.txt
-          sha256sum LinaDeskAndroid/*.apk | tee LinaDeskAndroid/LinaDesk-${{ env.VERSION }}-arm64-v8a.apk.sha256
+          echo "Lina Desk (${{ matrix.variant.name }}) ${{ env.VERSION }} is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > LinaDeskAndroid/SOURCE.txt
+          sha256sum LinaDeskAndroid/$APK | tee LinaDeskAndroid/$APK.sha256
 
-      - name: Upload Lina Desk Android client
+      - name: Upload Lina Desk Android ${{ matrix.variant.name }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: lina-desk-android-arm64-v8a
+          name: ${{ matrix.variant.artifact }}
           path: ./LinaDeskAndroid
           if-no-files-found: error

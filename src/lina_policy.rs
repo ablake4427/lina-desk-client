@@ -15,11 +15,25 @@
 use hbb_common::config;
 use std::sync::Once;
 
+// Two builds come from these sources (selected by LINA_DESK_VARIANT at build
+// time, see build.rs):
+// - client: the person being helped; incoming only, Allow decides.
+// - operator: the owner's helper; outgoing only, nobody can connect to it.
+
 /// Internal app/config name (config folder, IPC names). No spaces on purpose:
-/// upstream assumes app names are alphanumeric.
+/// upstream assumes app names are alphanumeric. Distinct from stock RustDesk
+/// so neither build shares RustDesk's folders.
+#[cfg(not(lina_operator))]
 pub const APP_NAME: &str = "LinaDesk";
+#[cfg(lina_operator)]
+pub const APP_NAME: &str = "LinaDeskOperator";
 /// Name shown to people.
+#[cfg(not(lina_operator))]
 pub const DISPLAY_NAME: &str = "Lina Desk";
+#[cfg(lina_operator)]
+pub const DISPLAY_NAME: &str = "Lina Desk Operator";
+/// True for the operator helper build.
+pub const IS_OPERATOR: bool = cfg!(lina_operator);
 /// Legal business name shown on the client.
 pub const COMPANY_NAME: &str = "Xcode technologies SRL";
 /// The only rendezvous/relay host this build talks to.
@@ -121,12 +135,16 @@ pub fn apply() {
         put(&config::OVERWRITE_SETTINGS, OVERWRITE_SETTINGS);
         put(&config::OVERWRITE_LOCAL_SETTINGS, OVERWRITE_LOCAL_SETTINGS);
         put(&config::HARD_SETTINGS, HARD_SETTINGS);
-        // The Windows client only receives help: no "connect to another PC".
-        // The Android app also lets the owner connect out from the phone
-        // (through the same fixed server; the other side still has to press
-        // Allow), so it keeps both directions.
-        #[cfg(not(target_os = "android"))]
-        put(&config::HARD_SETTINGS, &[("conn-type", "incoming")]);
+        if IS_OPERATOR {
+            // Operator helper: connects out only; it never registers for
+            // incoming sessions, so this PC/phone cannot be controlled
+            // through it. No clipboard sync in its sessions.
+            put(&config::HARD_SETTINGS, &[("conn-type", "outgoing")]);
+            put(&config::OVERWRITE_DISPLAY_SETTINGS, &[("disable_clipboard", "Y")]);
+        } else {
+            // Client: only receives help; no "connect to another PC".
+            put(&config::HARD_SETTINGS, &[("conn-type", "incoming")]);
+        }
         put(&config::BUILTIN_SETTINGS, BUILTIN_SETTINGS);
     });
 }
@@ -143,8 +161,8 @@ mod tests {
         assert_eq!(config::Config::get_option("approve-mode"), "click");
         config::Config::set_option("key".to_owned(), "other".to_owned());
         assert_eq!(config::Config::get_option("key"), SERVER_PUBLIC_KEY);
-        #[cfg(not(target_os = "android"))]
-        assert!(config::is_incoming_only());
+        assert_eq!(config::is_incoming_only(), !IS_OPERATOR);
+        assert_eq!(config::is_outgoing_only(), IS_OPERATOR);
         assert_eq!(crate::get_app_name(), APP_NAME);
     }
 }

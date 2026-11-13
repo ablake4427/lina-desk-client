@@ -2907,6 +2907,11 @@ impl Connection {
         }
         // After handling CloseReason messages, proceed to process other message types
         if let Some(message::Union::LoginRequest(lr)) = msg.union {
+            // Lina Desk operator helper: incoming sessions are never accepted.
+            if crate::lina_policy::IS_OPERATOR {
+                self.send_login_error("Incoming connections are disabled").await;
+                return false;
+            }
             if !self.check_login_scope(&lr).await {
                 return false;
             }

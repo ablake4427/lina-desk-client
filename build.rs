@@ -91,6 +91,12 @@ fn install_android_deps() {
 }
 
 fn main() {
+    // Lina Desk: LINA_DESK_VARIANT=operator builds the operator helper (outgoing
+    // only) from the same sources; anything else builds the client.
+    println!("cargo:rerun-if-env-changed=LINA_DESK_VARIANT");
+    if std::env::var("LINA_DESK_VARIANT").map_or(false, |v| v == "operator") {
+        println!("cargo:rustc-cfg=lina_operator");
+    }
     hbb_common::gen_version();
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
