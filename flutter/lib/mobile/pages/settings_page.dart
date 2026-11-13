@@ -38,7 +38,7 @@ class SettingsPage extends StatefulWidget implements PageShape {
   State<SettingsPage> createState() => _SettingsState();
 }
 
-const url = 'https://rustdesk.com/';
+const url = 'https://github.com/ablake4427/lina-desk-client';
 
 enum KeepScreenOn {
   never,
@@ -1050,7 +1050,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                 title: Text(translate("Version: ") + version),
                 value: Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('rustdesk.com',
+                  child: Text('Source code',
                       style: TextStyle(
                         decoration: TextDecoration.underline,
                       )),
@@ -1081,9 +1081,10 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
                 ),
                 leading: Icon(Icons.perm_identity)),
             SettingsTile(
-              title: Text(translate("Privacy Statement")),
+              title: Text(
+                  'Lina Desk by Xcode technologies SRL, based on RustDesk (GNU AGPL v3)'),
               onPressed: (context) =>
-                  launchUrlString('https://rustdesk.com/privacy.html'),
+                  launchUrlString('https://github.com/rustdesk/rustdesk'),
               leading: Icon(Icons.privacy_tip),
             )
           ],
@@ -1196,12 +1197,12 @@ void showAbout(OverlayDialogManager dialogManager) {
         Text('Version: $version'),
         InkWell(
             onTap: () async {
-              const url = 'https://rustdesk.com/';
+              const url = 'https://github.com/ablake4427/lina-desk-client';
               await launchUrl(Uri.parse(url));
             },
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('rustdesk.com',
+              child: Text('Source code',
                   style: TextStyle(
                     decoration: TextDecoration.underline,
                   )),

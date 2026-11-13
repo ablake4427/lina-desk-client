@@ -21,6 +21,7 @@ import '../../common/widgets/chat_page.dart';
 import '../../models/file_model.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
+import '../../lina_desk/brand.dart';
 
 /// Set only by this window's own close control, and only once the user has confirmed. Any other
 /// way the window can go - a session logout closing every window, the window manager, a native
@@ -368,6 +369,10 @@ Widget buildConnectionCard(Client client) {
       key: ValueKey(client.id),
       children: [
         _CmHeader(client: client),
+        if (!client.authorized && !client.disconnected)
+          const LinaWarning().marginSymmetric(horizontal: 5.0),
+        if (client.type_() == ClientType.terminal && !client.disconnected)
+          const _LinaShellNote(),
         client.type_() == ClientType.file ||
                 client.type_() == ClientType.portForward ||
                 client.type_() == ClientType.terminal ||
@@ -458,14 +463,8 @@ class _CmHeaderState extends State<_CmHeader>
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10.0),
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            Color(0xff00bfe1),
-            Color(0xff0071ff),
-          ],
-        ),
+        color: LinaDesk.panel,
+        border: Border.all(color: LinaDesk.line),
       ),
       margin: EdgeInsets.symmetric(horizontal: 5.0, vertical: 10.0),
       padding: EdgeInsets.only(
@@ -477,68 +476,54 @@ class _CmHeaderState extends State<_CmHeader>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildClientAvatar().marginOnly(right: 10.0),
+          _buildHelperIcon().marginOnly(right: 10.0),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FittedBox(
-                    child: Text(
-                  client.name,
+                const Text(
+                  LinaDesk.helperName,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: LinaDesk.text,
                     fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    overflow: TextOverflow.ellipsis,
+                    fontSize: 18,
                   ),
                   maxLines: 1,
-                )),
+                ),
+                Text(
+                  _requestText(),
+                  style: const TextStyle(color: LinaDesk.text2, fontSize: 13),
+                ),
+                const SizedBox(height: 4.0),
                 FittedBox(
                   child: Text(
-                    "(${client.peerId})",
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    "${client.name} (${client.peerId})",
+                    style: const TextStyle(color: LinaDesk.muted, fontSize: 12),
                   ),
                 ),
-                if (client.type_() == ClientType.terminal)
-                  FittedBox(
-                    child: Text(
-                      translate("Terminal"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                if (client.type_() == ClientType.file)
-                  FittedBox(
-                    child: Text(
-                      translate("Transfer file"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                if (client.type_() == ClientType.camera)
-                  FittedBox(
-                    child: Text(
-                      translate("View camera"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
                 if (client.portForward.isNotEmpty)
                   FittedBox(
                     child: Text(
                       "Port Forward: ${client.portForward}",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style:
+                          const TextStyle(color: LinaDesk.muted, fontSize: 12),
                     ),
                   ),
-                SizedBox(height: 10.0),
+                SizedBox(height: 8.0),
                 FittedBox(
                     child: Row(
                   children: [
                     Text(
                       client.authorized
                           ? client.disconnected
-                              ? translate("Disconnected")
-                              : translate("Connected")
-                          : "${translate("Request access to your device")}...",
-                      style: TextStyle(color: Colors.white),
+                              ? "Session ended"
+                              : "Connected"
+                          : "New request",
+                      style: TextStyle(
+                          color: client.authorized && !client.disconnected
+                              ? LinaDesk.ok
+                              : LinaDesk.text2),
                     ).marginOnly(right: 8.0),
                     if (client.authorized)
                       Obx(
@@ -546,7 +531,7 @@ class _CmHeaderState extends State<_CmHeader>
                           formatDurationToTime(
                             Duration(seconds: _time.value),
                           ),
-                          style: TextStyle(color: Colors.white),
+                          style: const TextStyle(color: LinaDesk.text2),
                         ),
                       )
                   ],
@@ -568,9 +553,12 @@ class _CmHeaderState extends State<_CmHeader>
                       .toggleCMChatPage(MessageKey(client.peerId, client.id));
                 }
               }),
-              icon: SvgPicture.asset(client.type_() == ClientType.file
-                  ? 'assets/file_transfer.svg'
-                  : 'assets/chat2.svg'),
+              icon: SvgPicture.asset(
+                  client.type_() == ClientType.file
+                      ? 'assets/file_transfer.svg'
+                      : 'assets/chat2.svg',
+                  colorFilter: const ColorFilter.mode(
+                      LinaDesk.accentHi, BlendMode.srcIn)),
               splashRadius: kDesktopIconButtonSplashRadius,
             ),
           )
@@ -582,6 +570,32 @@ class _CmHeaderState extends State<_CmHeader>
   @override
   bool get wantKeepAlive => true;
 
+  String _requestText() {
+    switch (client.type_()) {
+      case ClientType.terminal:
+        return "wants to run commands (Shell) on this PC";
+      case ClientType.file:
+        return "wants to send and receive files";
+      case ClientType.camera:
+        return "wants to see your camera";
+      default:
+        return "wants to connect to this PC";
+    }
+  }
+
+  Widget _buildHelperIcon() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: LinaDesk.warnSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.shield_outlined, color: LinaDesk.warn, size: 24),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildClientAvatar() {
     return buildAvatarWidget(
           avatar: client.avatar,
@@ -659,6 +673,114 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
     );
   }
 
+  Widget _linaRow(IconData icon, String title, String subtitle,
+      {bool? value, Function(bool)? onChanged}) {
+    final cb = onChanged;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: LinaDesk.accentSoft,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Icon(icon, size: 17, color: LinaDesk.accentHi),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: LinaDesk.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                Text(subtitle,
+                    style:
+                        const TextStyle(color: LinaDesk.muted, fontSize: 11)),
+              ],
+            ),
+          ),
+          if (value != null)
+            Transform.scale(
+              scale: 0.8,
+              child: Switch(
+                value: value,
+                activeColor: Colors.white,
+                activeTrackColor: LinaDesk.accent,
+                onChanged: cb == null
+                    ? null
+                    : (v) => checkClickTime(client.id, () => cb(v)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _linaBoard(BuildContext context, bool canModifyPermission) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(5.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.0),
+        color: LinaDesk.panel,
+        border: Border.all(color: LinaDesk.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            client.authorized ? "ALLOWED NOW" : "THEY ARE ASKING FOR",
+            style: const TextStyle(
+                color: LinaDesk.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.0),
+          ).marginOnly(left: 10, top: 9, bottom: 2),
+          _linaRow(Icons.desktop_windows_outlined, "See your screen",
+              "Everything on your screen, live"),
+          _linaRow(Icons.keyboard_outlined, "Control mouse and keyboard",
+              "Click and type on this PC while you watch",
+              value: client.keyboard,
+              onChanged: canModifyPermission
+                  ? (enabled) {
+                      bind.cmSwitchPermission(
+                          connId: client.id,
+                          name: "keyboard",
+                          enabled: enabled);
+                      setState(() {
+                        client.keyboard = enabled;
+                      });
+                    }
+                  : null),
+          _linaRow(Icons.folder_outlined, "Files",
+              "Send files to this PC and copy files from it",
+              value: client.file,
+              onChanged: canModifyPermission
+                  ? (enabled) {
+                      bind.cmSwitchPermission(
+                          connId: client.id, name: "file", enabled: enabled);
+                      setState(() {
+                        client.file = enabled;
+                      });
+                    }
+                  : null),
+          Text(
+            client.authorized
+                ? "Turn anything off at any time."
+                : "Turn off anything you do not want before you press Allow.",
+            style: const TextStyle(color: LinaDesk.muted, fontSize: 11),
+          ).marginOnly(left: 10, right: 10, bottom: 9, top: 2),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final crossAxisCount = 4;
@@ -666,6 +788,12 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
     final canModifyPermission =
         bind.mainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) !=
             'N';
+    // Lina Desk: only the approved pilot permissions (screen, control,
+    // files); clipboard, audio, restart, recording, input blocking and
+    // privacy mode are not part of this release.
+    if (client.type_() != ClientType.camera) {
+      return _linaBoard(context, canModifyPermission);
+    }
     return Container(
       width: double.infinity,
       height: 160.0,
@@ -882,7 +1010,9 @@ class _CmControlPanel extends StatelessWidget {
   buildAuthorized(BuildContext context) {
     final bool canElevate = bind.cmCanElevate();
     final model = Provider.of<ServerModel>(context);
-    final showElevation = canElevate &&
+    // Lina Desk: Admin (elevation) is not part of this release.
+    final showElevation = false &&
+        canElevate &&
         model.showElevation &&
         client.type_() == ClientType.remote;
     return Column(
@@ -1040,7 +1170,7 @@ class _CmControlPanel extends StatelessWidget {
               child: buildButton(context,
                   color: Colors.redAccent,
                   onClick: handleDisconnect,
-                  text: 'Disconnect',
+                  text: 'End',
                   icon: Icon(
                     Icons.link_off_rounded,
                     color: Colors.white,
@@ -1071,7 +1201,9 @@ class _CmControlPanel extends StatelessWidget {
   buildUnAuthorized(BuildContext context) {
     final bool canElevate = bind.cmCanElevate();
     final model = Provider.of<ServerModel>(context);
-    final showElevation = canElevate &&
+    // Lina Desk: Admin (elevation) is not part of this release.
+    final showElevation = false &&
+        canElevate &&
         model.showElevation &&
         client.type_() == ClientType.remote &&
         bind.mainGetBuildinOption(
@@ -1111,7 +1243,7 @@ class _CmControlPanel extends StatelessWidget {
                         handleAccept(context);
                         windowManager.minimize();
                       },
-                      text: 'Accept',
+                      text: 'Allow',
                       textColor: Colors.white,
                     ),
                   ],
@@ -1123,7 +1255,7 @@ class _CmControlPanel extends StatelessWidget {
                 color: Colors.transparent,
                 border: Border.all(color: Colors.grey),
                 onClick: handleDisconnect,
-                text: 'Cancel',
+                text: 'Decline',
                 textColor: null,
               ),
             ),
@@ -1461,6 +1593,56 @@ class __FileTransferLogPageState extends State<_FileTransferLogPage> {
                   : statusListView(jobTable);
             },
           )),
+    );
+  }
+}
+
+
+/// Lina Desk: what a Shell request means, shown on Shell request cards.
+class _LinaShellNote extends StatelessWidget {
+  const _LinaShellNote({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(5.0),
+      padding: const EdgeInsets.all(10.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.0),
+        color: LinaDesk.panel,
+        border: Border.all(color: LinaDesk.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: LinaDesk.warnSoft,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: const Icon(Icons.terminal, size: 17, color: LinaDesk.warn),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Run commands (Shell)",
+                    style: TextStyle(
+                        color: LinaDesk.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                Text(
+                    "Your helper can type commands on this PC with your Windows account. Allow only if you asked for this. End stops it.",
+                    style: TextStyle(color: LinaDesk.muted, fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

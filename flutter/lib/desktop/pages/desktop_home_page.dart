@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
+import 'package:flutter_hbb/lina_desk/brand.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -75,10 +76,120 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         block: _block, mask: true, use: canBeBlocked, child: child);
   }
 
+  // Lina Desk home (approved "Home - Ready" layout): ID, Copy, what to do,
+  // who never calls first, connection status, company and source link.
+  List<Widget> _buildLinaHome(BuildContext context) {
+    final model = gFFI.serverModel;
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const LinaMark(size: 22),
+                const SizedBox(width: 8),
+                const Text(LinaDesk.productName,
+                    style: TextStyle(
+                        color: LinaDesk.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const Text('YOUR ID',
+                style: TextStyle(
+                    color: LinaDesk.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2)),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: model.serverId,
+                    builder: (context, value, child) => FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        value.text,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            color: LinaDesk.text,
+                            fontSize: 34,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(
+                        ClipboardData(text: model.serverId.text));
+                    showToast(translate("Copied"));
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 16),
+                  label: const Text('Copy'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(LinaDesk.readIdTip,
+                style: TextStyle(color: LinaDesk.text2, fontSize: 14)),
+            const SizedBox(height: 14),
+            const LinaNote(text: LinaDesk.nobodyTip),
+            const SizedBox(height: 10),
+            const LinaWarning(),
+            const SizedBox(height: 14),
+            OnlineStatusWidget(
+              onSvcStatusChanged: () {
+                if (isInHomePage()) {
+                  Future.delayed(Duration(milliseconds: 300), () {
+                    _updateWindowSize();
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: LinaDesk.line),
+            const SizedBox(height: 12),
+            LinaFooter(
+              trailing: InkWell(
+                onTap: DesktopTabPage.onAddSetting,
+                child: const Text('Settings',
+                    style: TextStyle(color: LinaDesk.accentHi, fontSize: 12)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton(
+                onPressed: () {
+                  SystemNavigator.pop(); // Close the application
+                  // https://github.com/flutter/flutter/issues/66631
+                  if (isWindows) {
+                    exit(0);
+                  }
+                },
+                child: Text(translate('Quit')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
   Widget buildLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
     final isOutgoingOnly = bind.isOutgoingOnly();
-    final children = <Widget>[
+    final children = isIncomingOnly
+        ? _buildLinaHome(context)
+        : <Widget>[
       if (!isOutgoingOnly) buildPresetPasswordWarning(),
       if (bind.isCustomClient())
         Align(
@@ -111,7 +222,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         },
       ),
     ];
-    if (isIncomingOnly) {
+    if (false && isIncomingOnly) {
       children.addAll([
         Divider(),
         OnlineStatusWidget(
@@ -129,8 +240,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 200.0,
-        color: Theme.of(context).colorScheme.background,
+        width: isIncomingOnly ? 380.0 : 200.0,
+        color: isIncomingOnly
+            ? LinaDesk.bg
+            : Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
             Column(

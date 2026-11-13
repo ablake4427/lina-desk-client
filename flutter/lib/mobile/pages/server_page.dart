@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_hbb/lina_desk/brand.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -529,7 +530,8 @@ class ServerInfo extends StatelessWidget {
                     copyToClipboard(model.serverId.value.text.trim());
                   })
             ]).marginOnly(left: 39, bottom: 10),
-            // Password
+            // Password (Lina Desk: never shown in click-to-allow mode)
+            if (showOneTime)
             Row(children: [
               const Icon(Icons.lock_outline, color: Colors.grey, size: iconSize)
                   .marginOnly(right: iconMarginRight),
@@ -538,6 +540,7 @@ class ServerInfo extends StatelessWidget {
                 style: textStyleHeading,
               )
             ]),
+            if (showOneTime)
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(
                 !showOneTime ? '-' : model.serverPasswd.value.text,
@@ -559,7 +562,11 @@ class ServerInfo extends StatelessWidget {
                           })
                     ])
             ]).marginOnly(left: 40, bottom: 15),
-            ConnectionStateNotification()
+            ConnectionStateNotification(),
+            const SizedBox(height: 12),
+            const LinaWarning(),
+            const SizedBox(height: 10),
+            const LinaFooter(),
           ],
         ));
   }
@@ -620,24 +627,11 @@ class _PermissionCheckerState extends State<PermissionChecker> {
             serverModel.toggleFile,
             enabled: !permissionChangeLocked,
           ),
-          hasAudioPermission
-              ? PermissionRow(translate("Audio Capture"), serverModel.audioOk,
-                  serverModel.toggleAudio,
-                  enabled: !permissionChangeLocked)
-              : Row(children: [
-                  Icon(Icons.info_outline).marginOnly(right: 15),
-                  Expanded(
-                      child: Text(
-                    translate("android_version_audio_tip"),
-                    style: const TextStyle(color: MyTheme.darkGray),
-                  ))
-                ]),
-          PermissionRow(
-            translate("Enable clipboard"),
-            serverModel.clipboardOk,
-            serverModel.toggleClipboard,
-            enabled: !permissionChangeLocked,
-          ),
+          // Lina Desk: audio and clipboard are not part of this release.
+          if (false && hasAudioPermission)
+            PermissionRow(translate("Audio Capture"), serverModel.audioOk,
+                serverModel.toggleAudio,
+                enabled: !permissionChangeLocked),
         ]));
   }
 }
@@ -676,8 +670,11 @@ class ConnectionManager extends StatelessWidget {
     return Column(
         children: serverModel.clients
             .map((client) => PaddingCard(
-                title: translate(
-                    client.isFileTransfer ? "Transfer file" : "Share screen"),
+                title: client.authorized
+                    ? translate(client.isFileTransfer
+                        ? "Transfer file"
+                        : "Share screen")
+                    : LinaDesk.helperName,
                 titleIcon: client.isFileTransfer
                     ? Icon(Icons.folder_outlined)
                     : Icon(Icons.mobile_screen_share),
@@ -706,10 +703,7 @@ class ConnectionManager extends StatelessWidget {
                   ),
                   client.authorized
                       ? const SizedBox.shrink()
-                      : Text(
-                          translate("android_new_connection_tip"),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ).marginOnly(bottom: 5),
+                      : const LinaWarning().marginOnly(top: 6, bottom: 8),
                   client.authorized
                       ? _buildDisconnectButton(client)
                       : _buildNewConnectionHint(serverModel, client),
@@ -727,7 +721,7 @@ class ConnectionManager extends StatelessWidget {
         bind.cmCloseConnection(connId: client.id);
         gFFI.invokeMethod("cancel_notification", client.id);
       },
-      label: Text(translate("Disconnect")),
+      label: const Text("End"),
     );
     final buttons = [disconnectButton];
     if (client.inVoiceCall) {
@@ -762,14 +756,14 @@ class ConnectionManager extends StatelessWidget {
   Widget _buildNewConnectionHint(ServerModel serverModel, Client client) {
     return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
       TextButton(
-          child: Text(translate("Dismiss")),
+          child: const Text("Decline"),
           onPressed: () {
             serverModel.sendLoginResponse(client, false);
           }).marginOnly(right: 15),
       if (serverModel.approveMode != 'password')
         ElevatedButton.icon(
             icon: const Icon(Icons.check),
-            label: Text(translate("Accept")),
+            label: const Text("Allow"),
             onPressed: () {
               serverModel.sendLoginResponse(client, true);
             }),

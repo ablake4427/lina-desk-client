@@ -62,7 +62,7 @@ jobs:
         run: |
           cd flutter
           flutter pub get
-          flutter analyze --no-fatal-infos --no-fatal-warnings lib/lina_desk lib/common.dart lib/desktop/pages/desktop_home_page.dart lib/desktop/pages/server_page.dart lib/desktop/pages/desktop_setting_page.dart lib/mobile/pages/server_page.dart lib/mobile/pages/home_page.dart lib/main.dart
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib/lina_desk lib/common.dart lib/desktop/pages/desktop_home_page.dart lib/desktop/pages/server_page.dart lib/desktop/pages/desktop_setting_page.dart lib/mobile/pages/server_page.dart lib/mobile/pages/settings_page.dart lib/mobile/pages/home_page.dart lib/consts.dart lib/main.dart
 
   build-windows:
     name: windows x64 portable
