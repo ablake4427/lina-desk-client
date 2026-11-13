@@ -85,13 +85,22 @@ const OVERWRITE_LOCAL_SETTINGS: &[(&str, &str)] = &[
     ("theme", "dark"),
 ];
 
+/// Session defaults a new connection starts from. Lowest precedence: a choice
+/// the user saves later (Settings, or the toolbar of one peer) overrides it.
+const DEFAULT_DISPLAY_SETTINGS: &[(&str, &str)] = &[
+    // Phone screens are far larger than the operator's window, so showing them
+    // at their pixel size pushes them outside it. Fit them to the window.
+    ("view_style", "adaptive"),
+];
+
 /// Switches read by `is_incoming_only`, `is_disable_*`.
 const HARD_SETTINGS: &[(&str, &str)] = &[
     // Portable first: no installer, no service.
     ("disable-installation", "Y"),
     ("disable-account", "Y"),
     ("disable-ab", "Y"),
-    ("disable-tcp-listen", "Y"),
+    // No `disable-tcp-listen` on purpose: with it the client never tries the
+    // intranet address or a punch and every session goes through the relay.
     // No server/security settings and no command-line option changes.
     ("disable-settings", "Y"),
 ];
@@ -134,6 +143,7 @@ pub fn apply() {
         config::EXE_RENDEZVOUS_SERVER.write().unwrap().clear();
         put(&config::OVERWRITE_SETTINGS, OVERWRITE_SETTINGS);
         put(&config::OVERWRITE_LOCAL_SETTINGS, OVERWRITE_LOCAL_SETTINGS);
+        put(&config::DEFAULT_DISPLAY_SETTINGS, DEFAULT_DISPLAY_SETTINGS);
         put(&config::HARD_SETTINGS, HARD_SETTINGS);
         if IS_OPERATOR {
             // Operator helper: connects out only; it never registers for
@@ -164,5 +174,22 @@ mod tests {
         assert_eq!(config::is_incoming_only(), !IS_OPERATOR);
         assert_eq!(config::is_outgoing_only(), IS_OPERATOR);
         assert_eq!(crate::get_app_name(), APP_NAME);
+    }
+
+    #[test]
+    fn policy_connects_directly_and_fits_new_sessions() {
+        apply();
+        // The relay is the fallback, not the only route.
+        assert!(!config::is_disable_tcp_listen());
+        assert_eq!(config::Config::get_option("direct-server"), "N");
+        assert_eq!(config::Config::get_option("enable-lan-discovery"), "N");
+        // A new session fits the window; a saved user choice still wins.
+        let mut defaults = config::UserDefaultConfig::load();
+        defaults.set("view_style".to_owned(), String::new());
+        assert_eq!(config::UserDefaultConfig::load().get("view_style"), "adaptive");
+        defaults.set("view_style".to_owned(), "original".to_owned());
+        assert_eq!(config::UserDefaultConfig::load().get("view_style"), "original");
+        defaults.set("view_style".to_owned(), "adaptive".to_owned());
+        assert_eq!(config::UserDefaultConfig::load().get("view_style"), "adaptive");
     }
 }

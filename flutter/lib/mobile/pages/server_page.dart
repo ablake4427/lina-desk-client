@@ -308,149 +308,89 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
     final isButtonLocked = _countdown > 0;
 
     return AlertDialog(
-      content: ClipRRect(
-        borderRadius: BorderRadius.circular(20.0),
-        child: SingleChildScrollView(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [
-                  Color(0xffe242bc),
-                  Color(0xfff4727c),
-                ],
+      backgroundColor: LinaDesk.panel,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: LinaDesk.line),
+      ),
+      title: const Row(
+        children: [
+          Icon(Icons.shield_outlined, color: LinaDesk.warn, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "Before you share your screen",
+              style: TextStyle(
+                color: LinaDesk.text,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
-            padding: EdgeInsets.all(25.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_sharp,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      translate("Warning"),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20.0,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20),
-                Center(
-                  child: Image.asset(
-                    'assets/scam.png',
-                    width: 180,
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            LinaDesk.scamWarning,
+            style: TextStyle(color: LinaDesk.text2, fontSize: 14, height: 1.4),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Checkbox(
+                value: show_warning,
+                activeColor: LinaDesk.accent,
+                onChanged: (value) => setState(() => show_warning = value!),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => show_warning = !show_warning),
+                  child: const Text(
+                    "Don't show again",
+                    style: TextStyle(color: LinaDesk.text2, fontSize: 14),
                   ),
                 ),
-                SizedBox(height: 18),
-                Text(
-                  translate("scam_title"),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22.0,
-                  ),
-                ),
-                SizedBox(height: 18),
-                Text(
-                  "${translate("scam_text1")}\n\n${translate("scam_text2")}\n",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16.0,
-                  ),
-                ),
-                Row(
-                  children: <Widget>[
-                    Checkbox(
-                      value: show_warning,
-                      onChanged: (value) {
-                        setState(() {
-                          show_warning = value!;
-                        });
-                      },
-                    ),
-                    Text(
-                      translate("Don't show again"),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15.0,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(maxWidth: 150),
-                      child: ElevatedButton(
-                        onPressed: isButtonLocked
-                            ? null
-                            : () {
-                                Navigator.of(context).pop();
-                                _serverModel.toggleService();
-                                if (show_warning) {
-                                  bind.mainSetLocalOption(
-                                      key: "show-scam-warning", value: "N");
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                        ),
-                        child: Text(
-                          isButtonLocked
-                              ? "${translate("I Agree")} (${_countdown}s)"
-                              : translate("I Agree"),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.0,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 15),
-                    Container(
-                      constraints: BoxConstraints(maxWidth: 150),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                        ),
-                        child: Text(
-                          translate("Decline"),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.0,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            "Cancel",
+            style: TextStyle(color: LinaDesk.text2, fontSize: 14),
           ),
         ),
-      ),
-      contentPadding: EdgeInsets.all(0.0),
+        ElevatedButton(
+          onPressed: isButtonLocked
+              ? null
+              : () {
+                  Navigator.of(context).pop();
+                  _serverModel.toggleService();
+                  if (show_warning) {
+                    bind.mainSetLocalOption(
+                        key: "show-scam-warning", value: "N");
+                  }
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: LinaDesk.accent,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: LinaDesk.accentSoft,
+            disabledForegroundColor: LinaDesk.muted,
+          ),
+          child: Text(
+            isButtonLocked
+                ? "Start sharing (${_countdown}s)"
+                : "Start sharing",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+        ),
+      ],
     );
   }
 }
