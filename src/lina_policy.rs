@@ -73,8 +73,6 @@ const OVERWRITE_LOCAL_SETTINGS: &[(&str, &str)] = &[
 
 /// Switches read by `is_incoming_only`, `is_disable_*`.
 const HARD_SETTINGS: &[(&str, &str)] = &[
-    // This device only receives help; there is no "connect to another PC".
-    ("conn-type", "incoming"),
     // Portable first: no installer, no service.
     ("disable-installation", "Y"),
     ("disable-account", "Y"),
@@ -123,6 +121,12 @@ pub fn apply() {
         put(&config::OVERWRITE_SETTINGS, OVERWRITE_SETTINGS);
         put(&config::OVERWRITE_LOCAL_SETTINGS, OVERWRITE_LOCAL_SETTINGS);
         put(&config::HARD_SETTINGS, HARD_SETTINGS);
+        // The Windows client only receives help: no "connect to another PC".
+        // The Android app also lets the owner connect out from the phone
+        // (through the same fixed server; the other side still has to press
+        // Allow), so it keeps both directions.
+        #[cfg(not(target_os = "android"))]
+        put(&config::HARD_SETTINGS, &[("conn-type", "incoming")]);
         put(&config::BUILTIN_SETTINGS, BUILTIN_SETTINGS);
     });
 }
@@ -139,6 +143,7 @@ mod tests {
         assert_eq!(config::Config::get_option("approve-mode"), "click");
         config::Config::set_option("key".to_owned(), "other".to_owned());
         assert_eq!(config::Config::get_option("key"), SERVER_PUBLIC_KEY);
+        #[cfg(not(target_os = "android"))]
         assert!(config::is_incoming_only());
         assert_eq!(crate::get_app_name(), APP_NAME);
     }

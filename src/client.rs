@@ -2913,6 +2913,13 @@ impl LoginConfigHandler {
         conn_token: Option<String>,
     ) {
         let mut id = id;
+        // Lina Desk: connect only through the compiled server. An
+        // "id@server?key=..." target is reduced to the plain id, and relay is
+        // always used (the server enforces it too).
+        if let Some(pos) = id.find('@') {
+            id.truncate(pos);
+        }
+        force_relay = true;
         if id.contains("@") {
             let mut v = id.split("@");
             let raw_id: &str = v.next().unwrap_or_default();

@@ -2203,6 +2203,12 @@ Future<bool> initUniLinks() async {
     if (isWeb) {
       webInitialLink = initialLink;
       return false;
+    } else if (isMobile) {
+      // Lina Desk: a link that cold-starts the app is handled after the first
+      // frame, when connect() has a context (Get.context is null before it).
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => handleUriLink(uriString: initialLink));
+      return true;
     } else {
       return handleUriLink(uriString: initialLink);
     }
@@ -2474,11 +2480,10 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
   var queryParameters =
       uri.queryParameters.map((k, v) => MapEntry(k.toLowerCase(), v));
 
-  var key = queryParameters["key"];
-  if (id != null) {
-    if (key != null) {
-      id = "$id?key=$key";
-    }
+  // Lina Desk: links cannot point at another server or key; only the plain
+  // ID is used (the compiled server is the only one).
+  if (id != null && id.contains('@')) {
+    id = id.substring(0, id.indexOf('@'));
   }
 
   if (isMobile && id != null) {
