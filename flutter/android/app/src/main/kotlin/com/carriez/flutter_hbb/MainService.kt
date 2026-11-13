@@ -49,6 +49,11 @@ import kotlin.math.min
 
 const val DEFAULT_NOTIFY_TITLE = "Lina Desk"
 const val DEFAULT_NOTIFY_TEXT = "Service is running"
+
+// Lina Desk: the helper's own computer name means nothing to the person asked
+// and reads like a stranger's, so the request never names them.
+const val LOGIN_REQUEST_NOTIFY_TITLE = "Support request"
+const val LOGIN_REQUEST_NOTIFY_TEXT = "Someone wants to connect to this device"
 const val DEFAULT_NOTIFY_ID = 1
 const val NOTIFY_ID_OFFSET = 100
 
@@ -928,8 +933,8 @@ class MainService : Service() {
         val notification = notificationBuilder
             .setOngoing(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setContentTitle(translate("Do you accept?"))
-            .setContentText("$type:$username-$peerId")
+            .setContentTitle(LOGIN_REQUEST_NOTIFY_TITLE)
+            .setContentText(LOGIN_REQUEST_NOTIFY_TEXT)
             // .setStyle(MediaStyle().setShowActionsInCompactView(0, 1))
             // .addAction(R.drawable.check_blue, "check", genLoginRequestPendingIntent(true))
             // .addAction(R.drawable.close_red, "close", genLoginRequestPendingIntent(false))
@@ -948,7 +953,7 @@ class MainService : Service() {
             .setOngoing(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setContentTitle("$type ${translate("Established")}")
-            .setContentText("$username - $peerId")
+            .setContentText(peerId)
             .build()
         notificationManager.notify(getClientNotifyID(clientID), notification)
     }
@@ -963,7 +968,7 @@ class MainService : Service() {
             .setOngoing(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setContentTitle(translate("Do you accept?"))
-            .setContentText("$type:$username-$peerId")
+            .setContentText("$type: $peerId")
             .build()
         notificationManager.notify(getClientNotifyID(clientID), notification)
     }

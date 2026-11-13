@@ -29,6 +29,9 @@ class HomePageState extends State<HomePage> {
   int get selectedIndex => _selectedIndex;
   final List<PageShape> _pages = [];
   int _chatPageTabIndex = -1;
+  // The tab a person is meant to land on: "Share screen" when it exists, the
+  // chat tab otherwise (it opens empty and asks for nothing).
+  int _homeTabIndex = 0;
   bool get isChatPageCurrentTab => isAndroid
       ? _selectedIndex == _chatPageTabIndex
       : false; // change this when ios have chat page
@@ -43,6 +46,7 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     initPages();
+    _selectedIndex = _homeTabIndex;
   }
 
   void initPages() {
@@ -55,6 +59,11 @@ class HomePageState extends State<HomePage> {
     if (isAndroid && !bind.isOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;
       _pages.addAll([ChatPage(type: ChatPageType.mobileMain), ServerPage()]);
+      if (bind.isIncomingOnly()) {
+        // Lina Desk asks for help only: the ID card is its home screen, not the
+        // chat tab, which opens empty and asks for nothing.
+        _homeTabIndex = _pages.length - 1;
+      }
     }
     _pages.add(SettingsPage());
   }
@@ -63,9 +72,9 @@ class HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return WillPopScope(
         onWillPop: () async {
-          if (_selectedIndex != 0) {
+          if (_selectedIndex != _homeTabIndex) {
             setState(() {
-              _selectedIndex = 0;
+              _selectedIndex = _homeTabIndex;
             });
           } else {
             return true;

@@ -236,13 +236,13 @@ class ServiceNotRunningNotification extends StatelessWidget {
     final serverModel = Provider.of<ServerModel>(context);
 
     return PaddingCard(
-        title: translate("Service is not running"),
+        title: LinaDesk.notSharingTitle,
         titleIcon:
             const Icon(Icons.warning_amber_sharp, color: Colors.redAccent),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(translate("android_start_service_tip"),
+            Text(LinaDesk.startSharingTip,
                     style:
                         const TextStyle(fontSize: 12, color: MyTheme.darkGray))
                 .marginOnly(bottom: 8),
@@ -257,7 +257,7 @@ class ServiceNotRunningNotification extends StatelessWidget {
                     serverModel.toggleService();
                   }
                 },
-                label: Text(translate("Start service")))
+                label: const Text("Start sharing"))
           ],
         ));
   }
@@ -275,6 +275,10 @@ class ScamWarningDialog extends StatefulWidget {
 class ScamWarningDialogState extends State<ScamWarningDialog> {
   int _countdown = bind.isCustomClient() ? 0 : 12;
   bool show_warning = false;
+
+  // Android sends the person to its own "Display over other apps" page for the
+  // overlay, which reads as a random detour unless it is explained first.
+  bool _needsOverlayPermission = false;
   late Timer _timer;
   late ServerModel _serverModel;
 
@@ -283,6 +287,18 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
     super.initState();
     _serverModel = widget.serverModel;
     startCountdown();
+    _checkOverlayPermission();
+  }
+
+  void _checkOverlayPermission() async {
+    if (!isAndroid ||
+        androidVersion < 23 ||
+        bind.mainGetLocalOption(key: kOptionDisableFloatingWindow) == 'Y') {
+      return;
+    }
+    if (await AndroidPermissionManager.check(kSystemAlertWindow)) return;
+    if (!mounted) return;
+    setState(() => _needsOverlayPermission = true);
   }
 
   void startCountdown() {
@@ -333,6 +349,13 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_needsOverlayPermission)
+            const Text(
+              LinaDesk.overlayPermissionTip,
+              style:
+                  TextStyle(color: LinaDesk.text2, fontSize: 14, height: 1.4),
+            ),
+          if (_needsOverlayPermission) const SizedBox(height: 10),
           const Text(
             LinaDesk.scamWarning,
             style: TextStyle(color: LinaDesk.text2, fontSize: 14, height: 1.4),
@@ -622,7 +645,16 @@ class ConnectionManager extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: ClientInfo(client)),
+                      // Lina Desk: the asker is never named — the helper's own
+                      // computer name means nothing to the person here.
+                      Expanded(
+                          child: client.authorized
+                              ? ClientInfo(client)
+                              : const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(LinaDesk.someoneWantsToConnect,
+                                      style: TextStyle(fontSize: 16)),
+                                )),
                       Expanded(
                           flex: -1,
                           child: client.isFileTransfer || !client.authorized

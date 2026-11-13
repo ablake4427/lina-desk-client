@@ -14,8 +14,19 @@ class LinaDesk {
   static const String companyName = 'Xcode technologies SRL';
   // Title of the card that asks the person to allow a session.
   static const String helperName = 'Support request';
+  // The asker is never named: the helper's own computer name means nothing
+  // here and reads like a stranger's.
+  static const String someoneWantsToConnect =
+      'Someone wants to connect to this device';
   static const String scamWarning =
       'Only allow if you called this helper yourself. Xcode technologies SRL never calls you first.';
+  static const String notSharingTitle = 'Not sharing yet';
+  static const String startSharingTip =
+      'Tap Start sharing when your helper asks for your ID.';
+  // Shown before Android's "Display over other apps" page opens, so the jump
+  // out of the app is not unexplained.
+  static const String overlayPermissionTip =
+      'Lina Desk needs this to show the session controls on top of other apps.';
   static const String readIdTip = 'Read this number to your helper.';
   static const String nobodyTip =
       'Nobody can see or control this PC until you press Allow.';
