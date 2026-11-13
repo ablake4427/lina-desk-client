@@ -265,7 +265,8 @@ pub fn translate_locale(name: String, locale: &str) -> String {
                 && !name.starts_with("upgrade_rustdesk_server_pro")
                 && name != "powered_by_me"
             {
-                let app_name = crate::get_app_name();
+                // Lina Desk: people see the display name, not the internal app name.
+                let app_name = crate::lina_policy::DISPLAY_NAME.to_owned();
                 if !app_name.contains("RustDesk") {
                     s = s.replace("RustDesk", &app_name);
                 } else {

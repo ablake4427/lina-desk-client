@@ -226,7 +226,9 @@ pub unsafe extern "C" fn free_c_args(ptr: *mut *mut c_char, len: c_int) {
 #[cfg(windows)]
 #[no_mangle]
 pub unsafe extern "C" fn get_rustdesk_app_name(buffer: *mut u16, length: i32) -> i32 {
-    let name = crate::platform::wide_string(&crate::get_app_name());
+    // Lina Desk: the native window title (and single-instance lookup) uses the
+    // same display name Flutter sets later.
+    let name = crate::platform::wide_string(crate::lina_policy::DISPLAY_NAME);
     if length > name.len() as i32 {
         std::ptr::copy_nonoverlapping(name.as_ptr(), buffer, name.len());
         return 0;

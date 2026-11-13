@@ -2460,9 +2460,16 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    // Lina Desk: the compiled policy replaces custom.txt; nothing on disk can
+    // change the server, key or permission defaults of this build.
+    crate::lina_policy::apply();
+}
+
+#[allow(dead_code)]
+fn load_custom_client_upstream() {
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
-        read_custom_client(data.trim());
+        read_custom_client_upstream(data.trim());
         return;
     }
     let Some(path) = std::env::current_exe().map_or(None, |x| x.parent().map(|x| x.to_path_buf()))
@@ -2477,10 +2484,11 @@ pub fn load_custom_client() {
             log::error!("Failed to read custom client config");
             return;
         };
-        read_custom_client(&data.trim());
+        read_custom_client_upstream(&data.trim());
     }
 }
 
+#[allow(dead_code)]
 fn read_custom_client_advanced_settings(
     settings: serde_json::Value,
     map_display_settings: &HashMap<String, &&str>,
@@ -2557,7 +2565,14 @@ pub fn get_dst_align_rgba() -> usize {
     1
 }
 
-pub fn read_custom_client(config: &str) {
+pub fn read_custom_client(_config: &str) {
+    // Lina Desk: an external custom client payload is ignored; the compiled
+    // policy is applied instead.
+    crate::lina_policy::apply();
+}
+
+#[allow(dead_code)]
+fn read_custom_client_upstream(config: &str) {
     let Ok(data) = decode64(config) else {
         log::error!("Failed to decode custom client config");
         return;

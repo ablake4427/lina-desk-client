@@ -1127,7 +1127,8 @@ pub fn main_get_app_name() -> String {
 }
 
 pub fn main_get_app_name_sync() -> SyncReturn<String> {
-    SyncReturn(get_app_name())
+    // Lina Desk: window titles and visible text use the display name.
+    SyncReturn(crate::lina_policy::DISPLAY_NAME.to_owned())
 }
 
 pub fn main_uri_prefix_sync() -> SyncReturn<String> {
@@ -3029,6 +3030,8 @@ pub mod server_side {
                 crate::read_custom_client(&custom_client_config);
             }
         }
+        // Lina Desk: the fixed policy applies even when no config was passed.
+        crate::lina_policy::apply();
         std::thread::spawn(move || start_server(true));
     }
 
