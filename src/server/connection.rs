@@ -2961,9 +2961,13 @@ impl Connection {
                     }
 
                     self.terminal = true;
-                    // Lina Desk: a Shell lives only as long as the session the
-                    // person allowed; no persistent shell.
-                    self.terminal_persistent = false;
+                    // Lina Desk: every session here is relay-routed, so the Shell keeps the
+                    // persistence the helper asks for; a forced non-persistent Shell dies for
+                    // good on a transport blip instead of resuming.
+                    if let Some(o) = self.options_in_login.as_ref() {
+                        self.terminal_persistent =
+                            o.terminal_persistent.enum_value() == Ok(BoolOption::Yes);
+                    }
                     self.terminal_service_id = terminal.service_id;
                 }
                 Some(login_request::Union::PortForward(mut pf)) => {
@@ -4675,10 +4679,17 @@ impl Connection {
 
     #[cfg(windows)]
     async fn handle_elevation_request(&mut self, para: portable_client::StartPara) {
-        // Lina Desk: Admin is not part of this release. Remote elevation
-        // requests are refused without starting anything.
-        let _ = para;
-        let err = "Admin access is not available in this Lina Desk release".to_string();
+        let mut err;
+        if !self.keyboard {
+            err = "No permission".to_string();
+        } else {
+            err = "No need to elevate".to_string();
+            if !crate::platform::is_installed() && !portable_client::running() {
+                err = portable_client::start_portable_service(para)
+                    .err()
+                    .map_or("".to_string(), |e| e.to_string());
+            }
+        }
 
         let mut misc = Misc::new();
         misc.set_elevation_response(err);

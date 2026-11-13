@@ -50,16 +50,18 @@ const OVERWRITE_SETTINGS: &[(&str, &str)] = &[
     // Click-to-allow only: no permanent or one-time password access.
     ("approve-mode", "click"),
     ("verification-method", "use-temporary-password"),
-    // Approved pilot defaults: screen + control + files on; the person can
-    // switch control/files off before or during the session.
+    // Approved pilot defaults: screen + control + files + clipboard on; the
+    // person can switch control/files off before or during the session.
     ("enable-keyboard", "Y"),
     ("enable-file-transfer", "Y"),
+    // Text copy/paste both ways during a session, and file copy/paste between
+    // the two PCs.
+    ("enable-clipboard", "Y"),
+    ("enable-file-copy-paste", "Y"),
     // Shell: never part of a normal session. A helper has to send a separate
     // Shell request, which shows its own Allow/Decline card.
     ("enable-terminal", "Y"),
     // Hidden in the pilot.
-    ("enable-clipboard", "N"),
-    ("enable-file-copy-paste", "N"),
     ("enable-audio", "N"),
     ("enable-camera", "N"),
     ("enable-tunnel", "N"),
@@ -115,7 +117,6 @@ const BUILTIN_SETTINGS: &[(&str, &str)] = &[
     ("hide-remote-printer-settings", "Y"),
     ("hide-stop-service", "Y"),
     ("hide-powered-by-me", "Y"),
-    ("hide-elevate-button-in-accept-window", "Y"),
     ("disable-change-permanent-password", "Y"),
     ("disable-change-id", "Y"),
     ("disable-unlock-pin", "Y"),
@@ -148,9 +149,8 @@ pub fn apply() {
         if IS_OPERATOR {
             // Operator helper: connects out only; it never registers for
             // incoming sessions, so this PC/phone cannot be controlled
-            // through it. No clipboard sync in its sessions.
+            // through it.
             put(&config::HARD_SETTINGS, &[("conn-type", "outgoing")]);
-            put(&config::OVERWRITE_DISPLAY_SETTINGS, &[("disable_clipboard", "Y")]);
         } else {
             // Client: only receives help; no "connect to another PC".
             put(&config::HARD_SETTINGS, &[("conn-type", "incoming")]);
@@ -162,6 +162,54 @@ pub fn apply() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn builtin(key: &str) -> String {
+        config::BUILTIN_SETTINGS
+            .read()
+            .unwrap()
+            .get(key)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn overwritten_display_setting(key: &str) -> String {
+        config::OVERWRITE_DISPLAY_SETTINGS
+            .read()
+            .unwrap()
+            .get(key)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn policy_opens_admin_shell_and_clipboard() {
+        apply();
+        for key in [
+            "enable-keyboard",
+            "enable-file-transfer",
+            "enable-terminal",
+            "enable-clipboard",
+            "enable-file-copy-paste",
+        ] {
+            assert_eq!(config::Config::get_option(key), "Y", "{key}");
+        }
+        for key in [
+            "enable-audio",
+            "enable-camera",
+            "enable-tunnel",
+            "enable-remote-restart",
+            "enable-record-session",
+            "enable-block-input",
+            "enable-privacy-mode",
+            "enable-remote-printer",
+        ] {
+            assert_eq!(config::Config::get_option(key), "N", "{key}");
+        }
+        // The helper's admin ask reaches the person instead of being hidden away.
+        assert_ne!(builtin("hide-elevate-button-in-accept-window"), "Y");
+        // Neither build forces clipboard off in its own sessions.
+        assert_ne!(overwritten_display_setting("disable_clipboard"), "Y");
+    }
 
     #[test]
     fn policy_fixes_server_key_and_click_approval() {

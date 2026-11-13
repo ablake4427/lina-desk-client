@@ -1010,9 +1010,7 @@ class _CmControlPanel extends StatelessWidget {
   buildAuthorized(BuildContext context) {
     final bool canElevate = bind.cmCanElevate();
     final model = Provider.of<ServerModel>(context);
-    // Lina Desk: Admin (elevation) is not part of this release.
-    final showElevation = false &&
-        canElevate &&
+    final showElevation = canElevate &&
         model.showElevation &&
         client.type_() == ClientType.remote;
     return Column(
@@ -1148,20 +1146,25 @@ class _CmControlPanel extends StatelessWidget {
         ),
         Offstage(
           offstage: !showElevation,
-          child: buildButton(
-            context,
-            color: MyTheme.accent,
-            onClick: () {
-              handleElevate(context);
-              windowManager.minimize();
-            },
-            icon: Icon(
-              Icons.security_rounded,
-              color: Colors.white,
-              size: 14,
-            ),
-            text: 'Elevate',
-            textColor: Colors.white,
+          child: Column(
+            children: [
+              const _LinaAdminAsk(),
+              buildButton(
+                context,
+                color: MyTheme.accent,
+                onClick: () {
+                  handleElevate(context);
+                  windowManager.minimize();
+                },
+                icon: Icon(
+                  Icons.security_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
+                text: 'Allow',
+                textColor: Colors.white,
+              ),
+            ],
           ),
         ),
         Row(
@@ -1201,9 +1204,7 @@ class _CmControlPanel extends StatelessWidget {
   buildUnAuthorized(BuildContext context) {
     final bool canElevate = bind.cmCanElevate();
     final model = Provider.of<ServerModel>(context);
-    // Lina Desk: Admin (elevation) is not part of this release.
-    final showElevation = false &&
-        canElevate &&
+    final showElevation = canElevate &&
         model.showElevation &&
         client.type_() == ClientType.remote &&
         bind.mainGetBuildinOption(
@@ -1215,19 +1216,24 @@ class _CmControlPanel extends StatelessWidget {
       children: [
         Offstage(
           offstage: !showElevation || !showAccept,
-          child: buildButton(context, color: Colors.green[700], onClick: () {
-            handleAccept(context);
-            handleElevate(context);
-            windowManager.minimize();
-          },
-              text: 'Accept and Elevate',
-              icon: Icon(
-                Icons.security_rounded,
-                color: Colors.white,
-                size: 14,
-              ),
-              textColor: Colors.white,
-              tooltip: 'accept_and_elevate_btn_tooltip'),
+          child: Column(
+            children: [
+              const _LinaAdminAsk(),
+              buildButton(context, color: Colors.green[700], onClick: () {
+                handleAccept(context);
+                handleElevate(context);
+                windowManager.minimize();
+              },
+                  text: 'Accept and Elevate',
+                  icon: Icon(
+                    Icons.security_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                  textColor: Colors.white,
+                  tooltip: 'accept_and_elevate_btn_tooltip'),
+            ],
+          ),
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1597,6 +1603,56 @@ class __FileTransferLogPageState extends State<_FileTransferLogPage> {
   }
 }
 
+/// Lina Desk: what an admin (elevation) request means, shown on the card that
+/// carries the helper's ask.
+class _LinaAdminAsk extends StatelessWidget {
+  const _LinaAdminAsk({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(5.0),
+      padding: const EdgeInsets.all(10.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.0),
+        color: LinaDesk.panel,
+        border: Border.all(color: LinaDesk.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: LinaDesk.warnSoft,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: const Icon(Icons.security_outlined,
+                size: 17, color: LinaDesk.warn),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Someone asks for admin rights on this PC",
+                    style: TextStyle(
+                        color: LinaDesk.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+                Text(
+                    "Allow opens Windows' own admin approval on this PC, where you decide again. Then admin windows and that prompt can be seen and controlled.",
+                    style: TextStyle(color: LinaDesk.muted, fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Lina Desk: what a Shell request means, shown on Shell request cards.
 class _LinaShellNote extends StatelessWidget {
