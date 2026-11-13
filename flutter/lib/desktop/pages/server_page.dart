@@ -573,13 +573,13 @@ class _CmHeaderState extends State<_CmHeader>
   String _requestText() {
     switch (client.type_()) {
       case ClientType.terminal:
-        return "wants to run commands (Shell) on this PC";
+        return "Someone wants to run commands (Shell) on this PC";
       case ClientType.file:
-        return "wants to send and receive files";
+        return "Someone wants to send and receive files";
       case ClientType.camera:
-        return "wants to see your camera";
+        return "Someone wants to see your camera";
       default:
-        return "wants to connect to this PC";
+        return "Someone wants to connect to this PC";
     }
   }
 

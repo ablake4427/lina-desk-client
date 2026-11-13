@@ -12,8 +12,8 @@ class LinaDesk {
 
   static const String productName = 'Lina Desk';
   static const String companyName = 'Xcode technologies SRL';
-  // This release cannot verify who the helper is.
-  static const String helperName = 'Unverified helper';
+  // Title of the card that asks the person to allow a session.
+  static const String helperName = 'Support request';
   static const String scamWarning =
       'Only allow if you called this helper yourself. Xcode technologies SRL never calls you first.';
   static const String readIdTip = 'Read this number to your helper.';
