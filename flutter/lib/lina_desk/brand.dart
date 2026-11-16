@@ -78,16 +78,9 @@ class LinaMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinaDesk.signature,
-        borderRadius: BorderRadius.circular(size * 6 / 23),
-      ),
-      child: Icon(Icons.desktop_windows_outlined,
-          size: size * 0.62, color: Colors.white),
-    );
+    // The approved app icon (dark tile, corner brackets, spark).
+    return Image.asset('assets/icon.png',
+        width: size, height: size, filterQuality: FilterQuality.medium);
   }
 }
 
