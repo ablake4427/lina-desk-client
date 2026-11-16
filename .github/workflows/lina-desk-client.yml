@@ -4,13 +4,23 @@ name: Lina Desk client (Windows + Android)
 # (LINA_DESK_VARIANT, read by build.rs and android/app/build.gradle):
 #   - client:   the person being helped (incoming only, Allow decides)
 #   - operator: the owner's helper (outgoing only, nobody can connect to it)
-# Outputs: Windows x64 portable exe and Android arm64-v8a APK (signed with the
-# CI runner's generated debug key) for each variant, as Actions artifacts. Nothing is published, released,
-# tagged or signed with a production key here.
+# Outputs, as Actions artifacts (nothing is published, released or tagged here):
+#   - LinaDesk-Setup-<ver>.exe      Windows client; installs itself on first run
+#   - LinaDeskOperator.exe          Windows operator helper (portable, as before)
+#   - LinaDesk-<ver>.apk            Android client (arm64-v8a)
+#   - LinaDeskOperator-<ver>.apk    Android operator (arm64-v8a)
+# The APKs are signed with the fixed Lina Desk release key from these repository
+# secrets, so a new build updates an installed one and keeps its ID:
+#   LINA_ANDROID_KEYSTORE_B64        base64 of the .jks keystore
+#   LINA_ANDROID_KEYSTORE_PASSWORD   keystore password
+#   LINA_ANDROID_KEY_ALIAS           key alias
+#   LINA_ANDROID_KEY_PASSWORD        key password
+# Without them the build still runs but signs with the runner's throwaway debug
+# key and says so in SOURCE.txt; such an APK cannot update an installed one.
 
 on:
   push:
-    branches: [lina-desk]
+    branches: [lina-desk, lina-desk-install]
     paths: ['.github/**', 'src/**', 'flutter/**', 'libs/**', 'res/**', 'Cargo.toml', 'Cargo.lock', 'build.py']
   workflow_dispatch:
 
@@ -24,7 +34,8 @@ env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   # vcpkg version: 2026.07.29 (same pin as flutter-build.yml)
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
-  VERSION: "1.5.1"
+  # Keep in step with Cargo.toml and flutter/pubspec.yaml.
+  VERSION: "1.5.2"
   NDK_VERSION: "r28c"
   LINA_SERVER: "desk.xcode.it.com"
   LINA_KEY: "SiKlUxIe00QSAPd1JXGLvb4Vxx8W4mxx4HnfqKWIqQI="
@@ -64,18 +75,20 @@ jobs:
         run: |
           cd flutter
           flutter pub get
-          flutter analyze --no-fatal-infos --no-fatal-warnings lib/lina_desk lib/common.dart lib/desktop/pages/desktop_home_page.dart lib/desktop/pages/server_page.dart lib/desktop/pages/desktop_setting_page.dart lib/mobile/pages/server_page.dart lib/mobile/pages/settings_page.dart lib/mobile/pages/home_page.dart lib/consts.dart lib/main.dart
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib/lina_desk lib/common.dart lib/desktop/pages/desktop_home_page.dart lib/desktop/pages/server_page.dart lib/desktop/pages/desktop_setting_page.dart lib/mobile/pages/server_page.dart lib/mobile/pages/settings_page.dart lib/mobile/pages/home_page.dart lib/consts.dart lib/main.dart lib/common/widgets/toolbar.dart lib/common/widgets/peer_card.dart lib/desktop/widgets/remote_toolbar.dart lib/mobile/pages/remote_page.dart
 
   build-windows:
-    name: windows x64 portable (${{ matrix.variant.name }})
+    name: windows x64 (${{ matrix.variant.name }})
     needs: [generate-bridge]
     runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         variant:
-          - { name: client, exe: LinaDesk, artifact: lina-desk-windows-x86_64 }
-          - { name: operator, exe: LinaDeskOperator, artifact: lina-desk-operator-windows-x86_64 }
+          # `out` is the file people download. The client's is a setup file:
+          # started once, it installs Lina Desk (service included) and opens it.
+          - { name: client, exe: LinaDesk, out: LinaDesk-Setup-VERSION.exe, artifact: lina-desk-windows-x86_64 }
+          - { name: operator, exe: LinaDeskOperator, out: LinaDeskOperator.exe, artifact: lina-desk-operator-windows-x86_64 }
     env:
       TARGET: x86_64-pc-windows-msvc
       VCPKG_TRIPLET: x64-windows-static
@@ -169,20 +182,22 @@ jobs:
           mv ./linadesk/rustdesk.exe ./linadesk/${{ matrix.variant.exe }}.exe
           Get-ChildItem ./linadesk
 
-      - name: Build portable ${{ matrix.variant.exe }}.exe
+      - name: Pack ${{ matrix.variant.out }}
         shell: bash
         run: |
           EXE=${{ matrix.variant.exe }}.exe
+          OUT="${{ matrix.variant.out }}"
+          OUT="${OUT/VERSION/${{ env.VERSION }}}"
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
           python3 ./generate.py -f ../../linadesk/ -o . -e ../../linadesk/$EXE
           popd
           mkdir -p ./LinaDeskOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./LinaDeskOutput/$EXE
+          mv ./target/release/rustdesk-portable-packer.exe "./LinaDeskOutput/$OUT"
           cp LICENCE ./LinaDeskOutput/LICENCE.txt
           echo "Lina Desk (${{ matrix.variant.name }}) ${{ env.VERSION }} is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > ./LinaDeskOutput/SOURCE.txt
-          sha256sum ./LinaDeskOutput/$EXE | tee ./LinaDeskOutput/$EXE.sha256
+          (cd ./LinaDeskOutput && sha256sum "$OUT" | tee "$OUT.sha256")
 
       - name: Upload Lina Desk Windows ${{ matrix.variant.name }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -332,24 +347,43 @@ jobs:
         shell: bash
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          LINA_ANDROID_KEYSTORE_B64: ${{ secrets.LINA_ANDROID_KEYSTORE_B64 }}
+          LINA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LINA_ANDROID_KEYSTORE_PASSWORD }}
+          LINA_ANDROID_KEY_ALIAS: ${{ secrets.LINA_ANDROID_KEY_ALIAS }}
+          LINA_ANDROID_KEY_PASSWORD: ${{ secrets.LINA_ANDROID_KEY_PASSWORD }}
         run: |
           export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
           sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
-          # No production signing key in this repository: sign with the debug
-          # key Gradle generates on this CI runner (new key every run).
-          sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
+          if [ -n "$LINA_ANDROID_KEYSTORE_B64" ]; then
+            # The fixed Lina Desk release key: every build is an update of the last.
+            echo "$LINA_ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/lina-desk-release.jks"
+            {
+              echo "storeFile=$RUNNER_TEMP/lina-desk-release.jks"
+              echo "storePassword=$LINA_ANDROID_KEYSTORE_PASSWORD"
+              echo "keyAlias=$LINA_ANDROID_KEY_ALIAS"
+              echo "keyPassword=$LINA_ANDROID_KEY_PASSWORD"
+            } > ./flutter/android/key.properties
+            SIGNED_WITH="the Lina Desk release key"
+          else
+            echo "::warning::LINA_ANDROID_KEYSTORE_B64 is not set: this APK is signed with a throwaway debug key and cannot update an installed Lina Desk."
+            sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
+            SIGNED_WITH="a throwaway debug key (cannot update an installed app)"
+          fi
+          # A build number that only goes up, so Android accepts each build as newer.
+          BUILD_NUMBER=$((1000 + ${{ github.run_number }}))
           mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
           cp ./target/${{ env.TARGET }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
           pushd flutter
-          flutter build apk --release --target-platform android-arm64 --split-per-abi
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name "${{ env.VERSION }}" --build-number "$BUILD_NUMBER"
           popd
-          APK=${{ matrix.variant.apk }}-${{ env.VERSION }}-arm64-v8a.apk
+          rm -f ./flutter/android/key.properties "$RUNNER_TEMP/lina-desk-release.jks"
+          APK=${{ matrix.variant.apk }}-${{ env.VERSION }}.apk
           mkdir -p LinaDeskAndroid
           mv flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk LinaDeskAndroid/$APK
           cp LICENCE LinaDeskAndroid/LICENCE.txt
-          echo "Lina Desk (${{ matrix.variant.name }}) ${{ env.VERSION }} is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}" > LinaDeskAndroid/SOURCE.txt
-          sha256sum LinaDeskAndroid/$APK | tee LinaDeskAndroid/$APK.sha256
+          echo "Lina Desk (${{ matrix.variant.name }}) ${{ env.VERSION }} build $BUILD_NUMBER is built from https://github.com/${{ github.repository }} commit ${{ github.sha }}; signed with $SIGNED_WITH" > LinaDeskAndroid/SOURCE.txt
+          (cd LinaDeskAndroid && sha256sum "$APK" | tee "$APK.sha256")
 
       - name: Upload Lina Desk Android ${{ matrix.variant.name }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
