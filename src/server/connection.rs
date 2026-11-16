@@ -276,6 +276,19 @@ struct Session {
     last_recv_time: Arc<Mutex<Instant>>,
     random_password: String,
     tfa: bool,
+    // Lina Desk: the person pressed Allow for this session and has not
+    // reduced any permission since.
+    click_approved: bool,
+}
+
+impl Session {
+    fn timeout(&self) -> Duration {
+        if self.click_approved {
+            CLICK_SESSION_TIMEOUT
+        } else {
+            SESSION_TIMEOUT
+        }
+    }
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -416,6 +429,9 @@ pub struct Connection {
     login_scope: Option<[u8; 32]>,
     peer_argb: u32,
     session_last_recv_time: Option<Arc<Mutex<Instant>>>,
+    // Lina Desk: the person switched a permission off on this connection, so a
+    // later reconnect must ask again instead of resuming with the defaults.
+    permission_reduced: bool,
     chat_unanswered: bool,
     file_transferred: bool,
     #[cfg(windows)]
@@ -505,6 +521,10 @@ const MILLI1: Duration = Duration::from_millis(1);
 const SEND_TIMEOUT_VIDEO: u64 = 12_000;
 const SEND_TIMEOUT_OTHER: u64 = SEND_TIMEOUT_VIDEO * 10;
 const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
+// Lina Desk: how long a session the person allowed stays resumable after its
+// last received packet. Covers a Wi-Fi roam, a mobile cell change, a relay
+// restart or a short sleep without a second Allow.
+const CLICK_SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Whether the DRM backend can serve a Wayland login screen here.
 ///
@@ -621,6 +641,7 @@ impl Connection {
             login_scope: None,
             peer_argb: 0u32,
             session_last_recv_time: None,
+            permission_reduced: false,
             chat_unanswered: false,
             file_transferred: false,
             #[cfg(windows)]
@@ -751,6 +772,12 @@ impl Connection {
                         ipc::Data::Authorize => {
                             conn.set_conn_audit_primary_auth(ConnAuditPrimaryAuth::Click);
                             conn.require_2fa.take();
+                            // Lina Desk: remember the Allow so the same session can come
+                            // back after a network blip without a second card. Screen
+                            // sessions only; a Shell request always gets its own card.
+                            if conn.is_remote() && !conn.permission_reduced {
+                                raii::AuthedConnID::approve_click_session(conn.session_key());
+                            }
                             if !conn.send_logon_response_and_keep_alive().await {
                                 break;
                             }
@@ -797,6 +824,12 @@ impl Connection {
                         }
                         ipc::Data::SwitchPermission{name, enabled} => {
                             log::info!("Change permission {} -> {}", name, enabled);
+                            if !enabled {
+                                // A resumed session starts from the default permissions, so
+                                // once the person narrows them a reconnect has to ask again.
+                                conn.permission_reduced = true;
+                                raii::AuthedConnID::revoke_click_session(&conn.session_key());
+                            }
                             if &name == "keyboard" {
                                 conn.keyboard = enabled;
                                 conn.send_permission(Permission::Keyboard, enabled).await;
@@ -2648,7 +2681,7 @@ impl Connection {
         SESSIONS
             .lock()
             .unwrap()
-            .retain(|_, s| s.last_recv_time.lock().unwrap().elapsed() < SESSION_TIMEOUT);
+            .retain(|_, s| s.last_recv_time.lock().unwrap().elapsed() < s.timeout());
         let session = SESSIONS
             .lock()
             .unwrap()
@@ -2670,6 +2703,29 @@ impl Connection {
             }
         }
         false
+    }
+
+    /// Lina Desk: true when this login resumes a screen session the person
+    /// already allowed, within `CLICK_SESSION_TIMEOUT` of its last packet.
+    ///
+    /// The proof is the session id: 64 random bits the helper chose and only
+    /// ever sent inside the encrypted session. Nothing new is granted: screen
+    /// sessions only, the same helper id and name, and never after the person
+    /// ended the session, the helper closed it, or a permission was reduced.
+    fn is_recent_click_session(&mut self) -> bool {
+        if !self.is_remote() || self.lr.session_id == 0 {
+            return false;
+        }
+        let mut sessions = SESSIONS.lock().unwrap();
+        sessions.retain(|_, s| s.last_recv_time.lock().unwrap().elapsed() < s.timeout());
+        let resumed = sessions
+            .get(&self.session_key())
+            .map(|s| s.click_approved)
+            .unwrap_or(false);
+        if resumed {
+            log::info!("resume the allowed session");
+        }
+        resumed
     }
 
     #[inline]
@@ -2892,8 +2948,14 @@ impl Connection {
             // Move the CloseReason forward, as this message needs to be received when unauthorized, especially for kcp.
             if let Some(misc::Union::CloseReason(s)) = &misc.union {
                 log::info!("receive close reason: {}", s);
+                // "kcp" is what the helper's side sends when its loop ends on an error
+                // over a direct link (a deliberate close sends an empty reason first).
+                // That is a drop, not a goodbye: keep an allowed session resumable.
+                let dropped = s == "kcp";
                 self.on_close("Peer close", true).await;
-                raii::AuthedConnID::check_remove_session(self.inner.id(), self.session_key());
+                if !(dropped && raii::AuthedConnID::is_click_session(&self.session_key())) {
+                    raii::AuthedConnID::check_remove_session(self.inner.id(), self.session_key());
+                }
                 return false;
             }
         }
@@ -3046,7 +3108,14 @@ impl Connection {
                 crate::get_builtin_option(keys::OPTION_ALLOW_LOGON_SCREEN_PASSWORD) == "Y"
                     && is_logon();
 
-            if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
+            if self.is_recent_click_session() {
+                self.set_conn_audit_primary_auth(ConnAuditPrimaryAuth::Click);
+                if !self.send_logon_response_and_keep_alive().await {
+                    return false;
+                }
+                self.try_start_cm(lr.my_id.clone(), lr.my_name.clone(), self.authorized);
+            } else if (password::approve_mode() == ApproveMode::Click
+                && !allow_logon_screen_password)
                 || password::approve_mode() == ApproveMode::Both && !password::has_valid_password()
             {
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -7010,9 +7079,45 @@ mod raii {
                         random_password: password.unwrap_or_default(),
                         tfa: tfa.unwrap_or_default(),
                         last_recv_time: Arc::new(Mutex::new(Instant::now())),
+                        click_approved: false,
                     },
                 );
             }
+        }
+
+        /// Lina Desk: the person pressed Allow for this screen session.
+        pub fn approve_click_session(key: SessionKey) {
+            let mut lock = SESSIONS.lock().unwrap();
+            if let Some(session) = lock.get_mut(&key) {
+                session.click_approved = true;
+                *session.last_recv_time.lock().unwrap() = Instant::now();
+            } else {
+                lock.insert(
+                    key,
+                    Session {
+                        random_password: "".to_owned(),
+                        tfa: false,
+                        last_recv_time: Arc::new(Mutex::new(Instant::now())),
+                        click_approved: true,
+                    },
+                );
+            }
+        }
+
+        /// Lina Desk: a reconnect of this session has to ask again.
+        pub fn revoke_click_session(key: &SessionKey) {
+            if let Some(session) = SESSIONS.lock().unwrap().get_mut(key) {
+                session.click_approved = false;
+            }
+        }
+
+        pub fn is_click_session(key: &SessionKey) -> bool {
+            SESSIONS
+                .lock()
+                .unwrap()
+                .get(key)
+                .map(|s| s.click_approved)
+                .unwrap_or(false)
         }
 
         pub fn set_session_2fa(key: SessionKey) {
@@ -7027,6 +7132,7 @@ mod raii {
                         last_recv_time: Arc::new(Mutex::new(Instant::now())),
                         random_password: "".to_owned(),
                         tfa: true,
+                        click_approved: false,
                     },
                 );
             }
