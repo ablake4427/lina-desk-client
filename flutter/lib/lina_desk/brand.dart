@@ -30,6 +30,13 @@ class LinaDesk {
   static const String readIdTip = 'Read this number to your helper.';
   static const String nobodyTip =
       'Nobody can see or control this PC until you press Allow.';
+  // Shown when the one-time setup was skipped on first start.
+  static const String finishSetupTip =
+      'Setup is not finished. Your helper cannot use administrator windows on this PC until it is.';
+  static const String collectingLogs = 'Collecting logs...';
+  static const String logsSaved =
+      'Saved to your Desktop. Send that file to your helper.';
+  static const String logsFailed = 'The logs could not be collected.';
   static const String sourceUrl =
       'https://github.com/ablake4427/lina-desk-client';
 

@@ -138,6 +138,9 @@ pub fn core_main() -> Option<CoreMainAction> {
         args.push("--install".to_owned());
         flutter_args.push("--install".to_string());
     }
+    // Lina Desk: `--noinstall` (also used by the elevation helper) runs this
+    // copy as it is, without the first-run setup below.
+    let _no_install = args.contains(&"--noinstall".to_string());
     if args.contains(&"--noinstall".to_string()) {
         args.clear();
     }
@@ -180,6 +183,27 @@ pub fn core_main() -> Option<CoreMainAction> {
         }
     }
     hbb_common::init_log(false, &log_name);
+
+    // Lina Desk client on Windows: a copy started from the download becomes
+    // the installed version (one Windows prompt), because only the installed
+    // version lets the helper see and use administrator prompts. The operator
+    // helper never installs.
+    #[cfg(windows)]
+    if !crate::lina_policy::IS_OPERATOR
+        && !_no_install
+        && !_is_elevate
+        && !_is_run_as_system
+        && !config::is_disable_installation()
+        && (args.is_empty() || (args.len() == 1 && args[0] == "--install"))
+        && !crate::platform::is_cur_exe_the_installed()
+    {
+        if crate::platform::windows::lina_first_run_install() {
+            return None;
+        }
+        // Declined or failed: run as a plain program this time.
+        args.retain(|arg| arg != "--install");
+        flutter_args.retain(|arg| arg != "--install");
+    }
 
     // linux uni (url) go here.
     #[cfg(all(target_os = "linux", feature = "flutter"))]

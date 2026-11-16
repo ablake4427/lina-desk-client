@@ -988,6 +988,11 @@ async fn handle(data: Data, stream: &mut Connection) {
                     value = Some(Config::get_unlock_pin());
                 } else if name == "trusted-devices" {
                     value = Some(Config::get_trusted_devices_json());
+                } else if name == "lina-logs" {
+                    // Lina Desk "Send logs": the recent log lines of this
+                    // (background) process, which a normal user cannot read
+                    // from disk on an installed client.
+                    value = Some(crate::lina_logs::tail_text());
                 } else {
                     value = None;
                 }
@@ -1663,6 +1668,12 @@ async fn get_config_async(name: &str, ms_timeout: u64) -> ResultType<Option<Stri
         }
     }
     return Ok(None);
+}
+
+/// Lina Desk "Send logs": the recent log lines of the background service.
+#[tokio::main(flavor = "current_thread")]
+pub async fn get_lina_service_logs() -> Option<String> {
+    get_config_async("lina-logs", 5_000).await.ok().flatten()
 }
 
 pub async fn set_config_async(name: &str, value: String) -> ResultType<()> {

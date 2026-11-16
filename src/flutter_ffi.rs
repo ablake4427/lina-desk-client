@@ -2736,6 +2736,13 @@ pub fn main_get_common(key: String) -> String {
         return ui_interface::is_permanent_password_set().to_string();
     } else if key == "local-permanent-password-set" {
         return ui_interface::is_local_permanent_password_set().to_string();
+    } else if key == "lina-send-logs" {
+        // Lina Desk: collect the logs into one file on the Desktop; returns its
+        // path, or nothing when it could not be done.
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        return crate::lina_logs::collect();
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        return String::new();
     } else {
         if key.starts_with("download-data-") {
             let id = key.replace("download-data-", "");

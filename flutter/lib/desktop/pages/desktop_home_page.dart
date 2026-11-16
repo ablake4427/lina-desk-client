@@ -144,6 +144,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             const LinaNote(text: LinaDesk.nobodyTip),
             const SizedBox(height: 10),
             const LinaWarning(),
+            // Only when the one-time setup was skipped (the Windows prompt
+            // was declined on first start).
+            if (isWindows &&
+                !bind.isDisableInstallation() &&
+                !bind.mainIsInstalled()) ...[
+              const SizedBox(height: 10),
+              _buildLinaFinishSetup(),
+            ],
             const SizedBox(height: 14),
             OnlineStatusWidget(
               onSvcStatusChanged: () {
@@ -158,10 +166,23 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             const Divider(height: 1, color: LinaDesk.line),
             const SizedBox(height: 12),
             LinaFooter(
-              trailing: InkWell(
-                onTap: DesktopTabPage.onAddSetting,
-                child: const Text('Settings',
-                    style: TextStyle(color: LinaDesk.accentHi, fontSize: 12)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: _linaSendLogs,
+                    child: const Text('Send logs',
+                        style:
+                            TextStyle(color: LinaDesk.accentHi, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 14),
+                  InkWell(
+                    onTap: DesktopTabPage.onAddSetting,
+                    child: const Text('Settings',
+                        style:
+                            TextStyle(color: LinaDesk.accentHi, fontSize: 12)),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 10),
@@ -182,6 +203,45 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         ),
       ),
     ];
+  }
+
+  // Lina Desk: the one-time setup was skipped. Until it is finished the
+  // helper cannot see or use administrator prompts on this PC.
+  Widget _buildLinaFinishSetup() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: LinaDesk.panel,
+        border: Border.all(color: LinaDesk.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Expanded(
+            child: Text(LinaDesk.finishSetupTip,
+                style: TextStyle(color: LinaDesk.text2, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: () {
+              // One Windows prompt; the installed app opens when it is done.
+              bind.installInstallMe(
+                  options: 'desktopicon startmenu', path: '');
+            },
+            child: const Text('Finish setup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Lina Desk: put this device's logs into one file on the Desktop, for the
+  // person to hand to their helper.
+  Future<void> _linaSendLogs() async {
+    showToast(LinaDesk.collectingLogs);
+    final path = await bind.mainGetCommon(key: 'lina-send-logs');
+    showToast(path.isEmpty ? LinaDesk.logsFailed : LinaDesk.logsSaved);
   }
 
   Widget buildLeftPane(BuildContext context) {

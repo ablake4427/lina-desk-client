@@ -1824,6 +1824,36 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
     Ok(())
 }
 
+/// Lina Desk: a client started from anywhere but its installed place sets
+/// itself up (program folder, background service, firewall rule, shortcuts)
+/// with one Windows prompt, or brings an older setup up to this build, and
+/// then hands over to the installed copy.
+///
+/// Returns true when this process is done and should exit. False means it
+/// should carry on as a plain program for this run (the prompt was declined
+/// or setup failed); the next start asks again.
+pub fn lina_first_run_install() -> bool {
+    if is_installed() && !crate::ui_interface::is_installed_lower_version() {
+        // Already set up with this build or a newer one: open that one.
+        let (_, _, _, exe) = get_install_info();
+        return match std::process::Command::new(&exe).spawn() {
+            Ok(_) => true,
+            Err(err) => {
+                log::error!("Failed to open the installed app: {err}");
+                false
+            }
+        };
+    }
+    log::info!("Setting up {}", crate::get_app_name());
+    match install_me("desktopicon startmenu", "".to_owned(), false, false) {
+        Ok(()) => true,
+        Err(err) => {
+            log::warn!("Setup was not finished: {err:#}");
+            false
+        }
+    }
+}
+
 pub fn run_after_install() -> ResultType<()> {
     let (_, _, _, exe) = get_install_info();
     run_cmds(

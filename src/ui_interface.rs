@@ -109,13 +109,17 @@ pub fn install_me(_options: String, _path: String, _silent: bool, _debug: bool) 
     std::thread::spawn(move || {
         if let Err(err) = crate::platform::windows::install_me(&_options, _path, _silent, _debug) {
             log::error!("Installation failed: {err:#}");
-            if !_silent
-                && !err
-                    .downcast_ref::<::windows::core::Error>()
-                    .is_some_and(|err| {
-                        err.code() == ::windows::Win32::Foundation::ERROR_CANCELLED.to_hresult()
-                    })
-            {
+            let cancelled = err
+                .downcast_ref::<::windows::core::Error>()
+                .is_some_and(|err| {
+                    err.code() == ::windows::Win32::Foundation::ERROR_CANCELLED.to_hresult()
+                });
+            if cancelled {
+                // Lina Desk: the person said No to the Windows prompt. Keep
+                // the app open; it works, and setup can be finished later.
+                return;
+            }
+            if !_silent {
                 crate::platform::windows::message_box(&format!("Installation failed:\n{err:#}!"));
             }
         }
