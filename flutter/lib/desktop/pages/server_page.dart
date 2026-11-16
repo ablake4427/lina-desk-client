@@ -770,6 +770,20 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                       });
                     }
                   : null),
+          _linaRow(Icons.content_paste_outlined, "Copy and paste",
+              "Copy on one device and paste on the other",
+              value: client.clipboard,
+              onChanged: canModifyPermission
+                  ? (enabled) {
+                      bind.cmSwitchPermission(
+                          connId: client.id,
+                          name: "clipboard",
+                          enabled: enabled);
+                      setState(() {
+                        client.clipboard = enabled;
+                      });
+                    }
+                  : null),
           Text(
             client.authorized
                 ? "Turn anything off at any time."

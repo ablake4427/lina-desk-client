@@ -457,6 +457,18 @@ impl RendezvousMediator {
                     if timeout || (last_register_sent.is_none() && expired) {
                         if timeout {
                             fails += 1;
+                            // Lina Desk: the server never answered over UDP in this
+                            // run, so this network most likely drops it. Take the
+                            // next way in instead of waiting here forever.
+                            if fails >= MAX_FAILS1
+                                && last_register_resp.is_none()
+                                && crate::lina_policy::transport::level()
+                                    == crate::lina_policy::transport::UDP
+                            {
+                                crate::lina_policy::transport::step_down();
+                                MANUAL_RESTARTED.store(true, Ordering::SeqCst);
+                                bail!("No reply from the server over UDP");
+                            }
                             if fails >= MAX_FAILS2 {
                                 Config::update_latency(&host, -1);
                                 old_latency = 0;
@@ -647,15 +659,37 @@ impl RendezvousMediator {
     pub async fn start(server: ServerPtr, host: String) -> ResultType<()> {
         log::info!("start rendezvous mediator of {}", host);
         //If the investment agent type is http or https, then tcp forwarding is enabled.
+        use crate::lina_policy::transport;
         if (cfg!(debug_assertions) && option_env!("TEST_TCP").is_some())
             || Config::is_proxy()
-            || use_ws()
             || crate::is_udp_disabled()
         {
-            Self::start_tcp(server, host).await
-        } else {
-            Self::start_udp(server, host).await
+            return Self::start_tcp(server, host).await;
         }
+        // Lina Desk: UDP first; TCP on the same port when UDP gets no answer;
+        // a secure web socket on 443 when that is blocked too.
+        let level = transport::level();
+        if level == transport::UDP && !use_ws() {
+            return Self::start_udp(server, host).await;
+        }
+        // A short probe, so a blocked port costs seconds rather than the full
+        // connect timeout before the next way in is tried.
+        const PROBE_TIMEOUT: u64 = 6_000;
+        match connect_tcp(check_port(&host, RENDEZVOUS_PORT), PROBE_TIMEOUT).await {
+            Ok(stream) => drop(stream),
+            Err(err) => {
+                transport::step_down();
+                MANUAL_RESTARTED.store(true, Ordering::SeqCst);
+                bail!("Server not reachable over {}: {}", transport::name(level), err);
+            }
+        }
+        let res = Self::start_tcp(server, host).await;
+        if res.is_err() {
+            // The link dropped or the network changed: next time start again
+            // from the fastest way in.
+            transport::reset();
+        }
+        res
     }
 
     async fn handle_request_relay(&self, rr: RequestRelay, server: ServerPtr) -> ResultType<()> {

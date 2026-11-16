@@ -2914,12 +2914,13 @@ impl LoginConfigHandler {
     ) {
         let mut id = id;
         // Lina Desk: connect only through the compiled server. An
-        // "id@server?key=..." target is reduced to the plain id, and relay is
-        // always used (the server enforces it too).
+        // "id@server?key=..." target is reduced to the plain id. The relay is
+        // not forced: a direct path is tried first and the relay is the
+        // fallback (it is still used when the caller asks for it, e.g. the
+        // "connect via relay" retry).
         if let Some(pos) = id.find('@') {
             id.truncate(pos);
         }
-        force_relay = true;
         if id.contains("@") {
             let mut v = id.split("@");
             let raw_id: &str = v.next().unwrap_or_default();

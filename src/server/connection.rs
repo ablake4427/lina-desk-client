@@ -824,6 +824,10 @@ impl Connection {
                         }
                         ipc::Data::SwitchPermission{name, enabled} => {
                             log::info!("Change permission {} -> {}", name, enabled);
+                            // Lina Desk: the always-off features cannot be switched on.
+                            if enabled && crate::lina_policy::is_always_off_switch(&name) {
+                                continue;
+                            }
                             if !enabled {
                                 // A resumed session starts from the default permissions, so
                                 // once the person narrows them a reconnect has to ask again.
@@ -2730,6 +2734,10 @@ impl Connection {
 
     #[inline]
     pub fn is_permission_enabled_locally(enable_prefix_option: &str) -> bool {
+        // Lina Desk: no access preset turns an always-off feature on.
+        if crate::lina_policy::is_always_off(enable_prefix_option) {
+            return false;
+        }
         #[cfg(feature = "flutter")]
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
@@ -2751,6 +2759,11 @@ impl Connection {
         control_permissions: &Option<ControlPermissions>,
     ) -> bool {
         use hbb_common::rendezvous_proto::control_permissions::Permission;
+        // Lina Desk: permissions handed out by a server never override the
+        // always-off features either.
+        if crate::lina_policy::is_always_off(enable_prefix_option) {
+            return false;
+        }
         if let Some(control_permissions) = control_permissions {
             let permission = match enable_prefix_option {
                 keys::OPTION_ENABLE_KEYBOARD => Some(Permission::keyboard),
@@ -3023,9 +3036,9 @@ impl Connection {
                     }
 
                     self.terminal = true;
-                    // Lina Desk: every session here is relay-routed, so the Shell keeps the
-                    // persistence the helper asks for; a forced non-persistent Shell dies for
-                    // good on a transport blip instead of resuming.
+                    // Lina Desk: the Shell keeps the persistence the helper asks for; a
+                    // forced non-persistent Shell dies for good on a transport blip
+                    // (direct or relayed) instead of resuming.
                     if let Some(o) = self.options_in_login.as_ref() {
                         self.terminal_persistent =
                             o.terminal_persistent.enum_value() == Ok(BoolOption::Yes);
@@ -4157,7 +4170,17 @@ impl Connection {
                     }
                 }
                 Some(message::Union::VoiceCallRequest(request)) => {
-                    if request.is_connect {
+                    // Lina Desk: sound is always off, so a voice call is refused
+                    // before the person is ever asked.
+                    if !self.audio_enabled() {
+                        if request.is_connect {
+                            self.send(crate::client::new_voice_call_response(
+                                request.req_timestamp,
+                                false,
+                            ))
+                            .await;
+                        }
+                    } else if request.is_connect {
                         self.voice_call_request_timestamp = Some(
                             NonZeroI64::new(request.req_timestamp)
                                 .unwrap_or(NonZeroI64::new(get_time()).unwrap()),

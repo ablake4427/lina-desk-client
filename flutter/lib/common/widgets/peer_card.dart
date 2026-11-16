@@ -969,7 +969,6 @@ class RecentPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
       _terminalAction(context),
     ];
 
@@ -980,7 +979,7 @@ class RecentPeerCard extends BasePeerCard {
     final List favs = (await bind.mainGetFav()).toList();
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
+      // Lina Desk: no tunnels.
     }
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
@@ -1034,7 +1033,6 @@ class FavoritePeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
       _terminalAction(context),
     ];
 
@@ -1043,7 +1041,7 @@ class FavoritePeerCard extends BasePeerCard {
     }
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
+      // Lina Desk: no tunnels.
     }
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
@@ -1094,7 +1092,6 @@ class DiscoveredPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
       _terminalAction(context),
     ];
 
@@ -1105,7 +1102,7 @@ class DiscoveredPeerCard extends BasePeerCard {
     final List favs = (await bind.mainGetFav()).toList();
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
+      // Lina Desk: no tunnels.
     }
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
@@ -1153,7 +1150,6 @@ class AddressBookPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
       _terminalAction(context),
     ];
 
@@ -1162,7 +1158,7 @@ class AddressBookPeerCard extends BasePeerCard {
     }
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
+      // Lina Desk: no tunnels.
     }
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
@@ -1310,7 +1306,6 @@ class MyGroupPeerCard extends BasePeerCard {
     final List<MenuEntryBase<String>> menuItems = [
       _connectAction(context),
       _transferFileAction(context),
-      _viewCameraAction(context),
       _terminalAction(context),
     ];
 
@@ -1319,7 +1314,7 @@ class MyGroupPeerCard extends BasePeerCard {
     }
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
-      menuItems.add(_tcpTunnelingAction(context));
+      // Lina Desk: no tunnels.
     }
     // menuItems.add(await _openNewConnInOptAction(peer.id));
     if (!isWeb) {
