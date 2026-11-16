@@ -992,7 +992,14 @@ async fn handle(data: Data, stream: &mut Connection) {
                     // Lina Desk "Send logs": the recent log lines of this
                     // (background) process, which a normal user cannot read
                     // from disk on an installed client.
-                    value = Some(crate::lina_logs::tail_text());
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    {
+                        value = Some(crate::lina_logs::tail_text());
+                    }
+                    #[cfg(any(target_os = "android", target_os = "ios"))]
+                    {
+                        value = None;
+                    }
                 } else {
                     value = None;
                 }
